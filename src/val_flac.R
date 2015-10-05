@@ -61,6 +61,28 @@ load.corpus <- function(index.file) {
   rbindlist(lapply(files, load.file))
 }
 
+make.samples <- function() {
+  la.verse[,
+    .(auth, work, loc, verse, int.grp = ceiling(unitid / sample.size))
+  ][,
+    .(
+      sampleid = .GRP,
+      start = min(.I),
+      end = max(.I),
+      lstart = loc[which.min(.I)],
+      lend = loc[which.max(.I)],
+      text = paste(
+        unlist(la.stemmer(standardize(unlist(strsplit(verse, " "))))),
+        collapse = " "
+      )
+    ),
+    by = .(auth, work, int.grp)
+  ][
+    nchar(text) > mean(nchar(text)) - 3 * sd(nchar(text))
+    & nchar(text) < mean(nchar(text)) + 3 * sd(nchar(text)),
+    .(auth = factor(auth), work = factor(work), start, end, sampleid, lstart, lend, text)
+  ]
+}
 
 cluster.series <- function(x, k = 5, nreps = 10, cores = NA) {
   # generate a series of k-means clusterings
@@ -79,11 +101,13 @@ cluster.series <- function(x, k = 5, nreps = 10, cores = NA) {
     kmeans(x, k)$cluster
   }
 
-  do.call(cbind, ifelse(is.na(cores),
-    mclapply(1:nreps, inner.function, mc.cores = cores),
-    lapply(1:nreps, inner.function)
-  ))
+  if(is.na(cores)) {
+    return(do.call(cbind, lapply(1:nreps, inner.function)))
+  } else {
+    return(do.call(cbind, mclapply(1:nreps, inner.function, mc.cores = cores)))
+  }
 }
+
 
 #
 # main
@@ -113,26 +137,6 @@ la.stemmer <- build.stemmer.table(
 # assign samples to verse lines
 cat("Sampling\n")
 
-samples <- la.verse[,
-  .(auth, work, loc, verse, int.grp = ceiling(unitid / sample.size))
-][,
-  .(
-    sampleid = .GRP,
-    start = min(.I),
-    end = max(.I),
-    lstart = loc[which.min(.I)],
-    lend = loc[which.max(.I)],
-    text = paste(
-      unlist(la.stemmer(standardize(unlist(strsplit(verse, " "))))),
-      collapse = " "
-    )
-  ),
-  by = .(auth, work, int.grp)
-][
-  nchar(text) > mean(nchar(text)) - 3 * sd(nchar(text))
-  & nchar(text) < mean(nchar(text)) + 3 * sd(nchar(text)),
-  .(auth = factor(auth), work = factor(work), start, end, sampleid, lstart, lend, text)
-]
 
 
 # 2. Generate feature vectors for samples
@@ -230,6 +234,7 @@ kmcl.tfidf.k.orig <- rep(2:k.max, each=nreps)
 
 randscores.tfidf.k.orig <- lapply(2:k.max, function(k) {
   combn(which(kmcl.tfidf.k.orig == k), 2, function(i) {
+    cat(i, "\n")
     adjustedRandIndex(kmcl.tfidf.cl[,i[1]], kmcl.tfidf.cl[, i[2]])
   })
 })
