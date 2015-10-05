@@ -119,7 +119,7 @@ set.seed(19810111)
 sample.size <- 30
 stopwords.maxsamples <- 0.5
 ntopics <- 50
-ncores <- 3
+ncores <- 2
 
 # 1. preprocessing the texts
 
@@ -157,7 +157,7 @@ dtm.tfidf <- DocumentTermMatrix(tm.corp, control=list(
 
 feat.tfidf <- as.matrix(dtm.tfidf)
 
-cat("Calculating PCA for tf-idf scores")
+cat("Calculating PCA for tf-idf scores\n")
 pca.tfidf <- prcomp(feat.tfidf)
 
 #  2. b) author-adjusted tf-idf weights
@@ -172,7 +172,7 @@ for (name in levels(samples$auth)) {
   feat.adjusted[samples$auth == name,] <- t(t(feat.tfidf[samples$auth == name,]) - sig.auth)
 }
 
-cat("Calculating PCA for author-adjusted tf-idf scores")
+cat("Calculating PCA for author-adjusted tf-idf scores\n")
 proj.pca.adjusted <- predict(pca.tfidf, feat.adjusted)
 pca.adjusted <- prcomp(feat.adjusted)
 
